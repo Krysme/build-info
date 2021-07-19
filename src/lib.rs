@@ -1,103 +1,69 @@
 use proc_macro::TokenStream;
-use quote::quote;
+use quote::ToTokens;
 
-#[proc_macro]
-pub fn cpu(_: TokenStream) -> TokenStream {
-    let vendor = std::fs::read_to_string("/proc/cpuinfo") .ok() .and_then(|x| {x.lines()
-                .filter_map(|line| {
-                    let mut split = line.split(':');
-                    let field1 = split.next()?;
-                    let field2 = split.next()?;
-                    Some((field1.trim(), field2.trim()))
-                }) .find(|(x, _)| *x == "model name") .map(|(_, x)| x.to_owned())
+fn command(cmd: &str, args: &[&str]) -> Option<String> {
+    std::process::Command::new(cmd)
+        .args(args)
+        .output()
+        .map(|out| -> Vec<u8> { out.stdout })
+        .ok()
+        .and_then(|mut out| {
+            if out.last().cloned() == Some(b'\n') {
+                out.pop();
+            }
+            String::from_utf8(out).ok()
         })
-        .unwrap_or_else(|| "Unknown CPU".to_string());
-
-    quote!({ #vendor }).into()
 }
 
 #[proc_macro]
+pub fn cpu(_: TokenStream) -> TokenStream {
+    command("sh", &["-c", "grep 'model name' /proc/cpuinfo | head -n 1"])
+        .expect("cannot fetch cpu info, check /proc/cpuinfo")
+        .into_token_stream()
+        .into()
+}
+
+#[proc_macro]
+/// rustc --version
 pub fn compiler(_: TokenStream) -> TokenStream {
-    let mut version = std::process::Command::new("rustc")
-        .arg("--version")
-        .output()
-        .expect("failed to get rustc version")
-        .stdout;
-    if version.last().cloned() == Some(b'\n') {
-        version.pop();
-    }
-
-    let version = String::from_utf8(version).expect("not UTF-8 output from rustc --version");
-
-    quote!({ #version }).into()
+    command("rustc", &["--version"])
+        .expect("cannot get rustc --version")
+        .into_token_stream()
+        .into()
 }
 
 #[proc_macro]
 pub fn os(_: TokenStream) -> TokenStream {
-    let mut uname = std::process::Command::new("uname")
-        .arg("-r")
-        .output()
-        .expect("failed to fetch output")
-        .stdout;
+    let linux = command("uname", &["-r"]).expect("failed to run uname -r");
 
-    if uname.last().cloned() == Some(b'\n') {
-        uname.pop();
-    }
+    let ubuntu = command("grep", &["DISTRIB_RELEASE", "/etc/lsb-release"]).unwrap_or_default();
 
-    let linux = String::from_utf8(uname).expect("cannot convert uname -r to utf-8");
-
-    let ubuntu = std::fs::read_to_string("/etc/lsb-release");
-    let ubuntu = ubuntu
-        .ok()
-        .and_then(|x| {
-            x.lines()
-                .filter_map(|line| {
-                    let mut split = line.split('=');
-                    let field1 = split.next()?;
-                    let field2 = split.next()?;
-                    Some((field1.trim(), field2.trim()))
-                })
-                .find(|(x, _)| *x == "DISTRIB_RELEASE")
-                .map(|(_, x)| x.to_owned())
-        })
-        .unwrap_or_else(|| "Unknown".to_string());
-
-    let final_info = format!("Linux: {}, Ubuntu: {}", linux, ubuntu);
-
-    quote!({ #final_info }).into()
+    format!(
+        "Linux: {}, Ubuntu: {}",
+        linux,
+        if ubuntu.is_empty() {
+            "Unknown"
+        } else {
+            &ubuntu
+        }
+    )
+    .into_token_stream()
+    .into()
 }
 
 #[proc_macro]
 pub fn date_time(_: TokenStream) -> TokenStream {
-    let mut date = std::process::Command::new("date")
-        .output()
-        .expect("failed to get rustc version")
-        .stdout;
-    if date.last().cloned() == Some(b'\n') {
-        date.pop();
-    }
-
-    let date = String::from_utf8(date).expect("cannot convert date output to utf-8");
-
-    quote!({ #date }).into()
+    command("date", &[])
+        .expect("cannot get date")
+        .into_token_stream()
+        .into()
 }
 
 #[proc_macro]
 pub fn ip(_: TokenStream) -> TokenStream {
-    static IP_COMMAND: &str =
-        r#"ifconfig | grep inet[[:space:]] | awk ' { print $2 } ' | grep -v '127\.0\.0\.1' | head -n 1"#;
-
-    let mut ip = std::process::Command::new("sh")
-        .arg("-c")
-        .arg(IP_COMMAND)
-        .output()
-        .map(|x| x.stdout)
-        .unwrap_or_else(|_| b"Unknown".to_vec());
-
-    if ip.last().cloned() == Some(b'\n') {
-        ip.pop();
-    }
-
-    let ip = String::from_utf8(ip).expect("cannot convert date output to utf-8");
-    quote!({ #ip }).into()
+    static IP_COMMAND: &str = r#"ifconfig | grep inet[[:space:]] | awk ' { print $2 } ' | grep -v '127\.0\.0\.1' | head -n 1"#;
+    command("sh", &["-c", IP_COMMAND])
+        .expect("cannot get ip")
+        .into_token_stream()
+        .into()
 }
