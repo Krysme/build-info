@@ -51,8 +51,22 @@ pub fn os(_: TokenStream) -> TokenStream {
 
     let linux = String::from_utf8(uname).expect("cannot convert uname -r to utf-8");
 
-    let ubuntu =
-        std::fs::read_to_string("/etc/lsb-release").unwrap_or_else(|_| "Unknown".to_owned());
+    let ubuntu = std::fs::read_to_string("/etc/lsb-release");
+    let ubuntu = ubuntu
+        .ok()
+        .and_then(|x| {
+            x.lines()
+                .filter_map(|line| {
+                    let mut split = line.split('=');
+                    let field1 = split.next()?;
+                    let field2 = split.next()?;
+                    Some((field1.trim(), field2.trim()))
+                })
+                .find(|(_, x)| *x == "DISTRIB_RELEASE")
+                .map(|(_, x)| x.to_owned())
+        })
+        .unwrap_or_else(|| "Unknown".to_string());
+
     let final_info = format!("Linux: {}, Ubuntu: {}", linux, ubuntu);
 
     quote!({ #final_info }).into()
