@@ -7,8 +7,7 @@ pub fn cpu(_: TokenStream) -> TokenStream {
         .ok()
         .and_then(|x| {
             x.lines()
-                .filter_map(|line| {
-                    let mut split = line.split(':');
+                .filter_map(|line| {let mut split = line.split(':');
                     let field1 = split.next()?;
                     let field2 = split.next()?;
                     Some((field1.trim(), field2.trim()))
@@ -70,4 +69,19 @@ pub fn os(_: TokenStream) -> TokenStream {
     let final_info = format!("Linux: {}, Ubuntu: {}", linux, ubuntu);
 
     quote!({ #final_info }).into()
+}
+
+#[proc_macro]
+pub fn date_time(_: TokenStream) -> TokenStream {
+    let mut date = std::process::Command::new("date")
+        .output()
+        .expect("failed to get rustc version")
+        .stdout;
+    if date.last().cloned() == Some(b'\n') {
+        date.pop();
+    }
+
+    let date = String::from_utf8(date).expect("cannot convert date output to utf-8");
+
+    quote!({ #date }).into()
 }
