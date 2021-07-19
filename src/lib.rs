@@ -7,7 +7,8 @@ pub fn cpu(_: TokenStream) -> TokenStream {
         .ok()
         .and_then(|x| {
             x.lines()
-                .filter_map(|line| {let mut split = line.split(':');
+                .filter_map(|line| {
+                    let mut split = line.split(':');
                     let field1 = split.next()?;
                     let field2 = split.next()?;
                     Some((field1.trim(), field2.trim()))
@@ -84,4 +85,24 @@ pub fn date_time(_: TokenStream) -> TokenStream {
     let date = String::from_utf8(date).expect("cannot convert date output to utf-8");
 
     quote!({ #date }).into()
+}
+
+#[proc_macro]
+pub fn ip(_: TokenStream) -> TokenStream {
+    static IP_COMMAND: &str =
+        r#"ifconfig | grep inet[[:space:]] | awk ' { print $2 } ' | grep -v '127\.0\.0\.1'"#;
+
+    let mut ip = std::process::Command::new("sh")
+        .arg("-c")
+        .arg(IP_COMMAND)
+        .output()
+        .map(|x| x.stdout)
+        .unwrap_or_else(|_| b"Unknown".to_vec());
+
+    if ip.last().cloned() == Some(b'\n') {
+        ip.pop();
+    }
+
+    let ip = String::from_utf8(ip).expect("cannot convert date output to utf-8");
+    quote!({ #ip }).into()
 }
