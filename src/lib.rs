@@ -62,7 +62,7 @@ pub fn os(_: TokenStream) -> TokenStream {
                     let field2 = split.next()?;
                     Some((field1.trim(), field2.trim()))
                 })
-                .find(|(_, x)| *x == "DISTRIB_RELEASE")
+                .find(|(x, _)| *x == "DISTRIB_RELEASE")
                 .map(|(_, x)| x.to_owned())
         })
         .unwrap_or_else(|| "Unknown".to_string());
