@@ -3,18 +3,13 @@ use quote::quote;
 
 #[proc_macro]
 pub fn cpu(_: TokenStream) -> TokenStream {
-    let vendor = std::fs::read_to_string("/proc/cpuinfo")
-        .ok()
-        .and_then(|x| {
-            x.lines()
+    let vendor = std::fs::read_to_string("/proc/cpuinfo") .ok() .and_then(|x| {x.lines()
                 .filter_map(|line| {
                     let mut split = line.split(':');
                     let field1 = split.next()?;
                     let field2 = split.next()?;
                     Some((field1.trim(), field2.trim()))
-                })
-                .find(|(x, _)| *x == "model name")
-                .map(|(_, x)| x.to_owned())
+                }) .find(|(x, _)| *x == "model name") .map(|(_, x)| x.to_owned())
         })
         .unwrap_or_else(|| "Unknown CPU".to_string());
 
@@ -90,7 +85,7 @@ pub fn date_time(_: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn ip(_: TokenStream) -> TokenStream {
     static IP_COMMAND: &str =
-        r#"ifconfig | grep inet[[:space:]] | awk ' { print $2 } ' | grep -v '127\.0\.0\.1'"#;
+        r#"ifconfig | grep inet[[:space:]] | awk ' { print $2 } ' | grep -v '127\.0\.0\.1' | head -n 1"#;
 
     let mut ip = std::process::Command::new("sh")
         .arg("-c")
