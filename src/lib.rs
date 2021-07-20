@@ -17,8 +17,13 @@ fn command(cmd: &str, args: &[&str]) -> Option<String> {
 
 #[proc_macro]
 pub fn cpu(_: TokenStream) -> TokenStream {
-    command("sh", &["-c", "grep 'model name' /proc/cpuinfo | head -n 1"])
-        .expect("cannot fetch cpu info, check /proc/cpuinfo")
+    let s = command("sh", &["-c", "grep 'model name' /proc/cpuinfo | head -n 1"])
+        .expect("cannot fetch cpu info, check /proc/cpuinfo");
+
+    s.split(':')
+        .nth(1)
+        .expect("wrong info in /proc/cpuinfo")
+        .trim()
         .into_token_stream()
         .into()
 }
