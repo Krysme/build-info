@@ -43,13 +43,14 @@ pub fn os(_: TokenStream) -> TokenStream {
 
     let ubuntu = command("grep", &["DISTRIB_RELEASE", "/etc/lsb-release"]).unwrap_or_default();
 
+    let unknown = "Unknown";
     format!(
         "Linux: {}, Ubuntu: {}",
         linux,
-        if ubuntu.is_empty() {
-            "Unknown"
+        if let Some(ubuntu) = ubuntu.split('=').nth(1) {
+            ubuntu.trim()
         } else {
-            &ubuntu
+            unknown
         }
     )
     .into_token_stream()
